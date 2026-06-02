@@ -65,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <p className="text-white/20 text-xs font-body">
                     © {new Date().getFullYear()} The Nook Bite. All rights reserved.
                   </p>
-                  <p className="text-white/20 text-xs font-body">Lahore, Pakistan</p>
+                  <p className="text-white/20 text-xs font-body">Mandi Bahauddin, Pakistan</p>
                 </div>
               </div>
             </footer>
