@@ -56,23 +56,23 @@ export function Navbar() {
             : 'bg-surface border-b border-theme'
         }`}
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-28 flex items-center justify-between">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-[108px] flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0" onClick={() => setMenuOpen(false)}>
             <Image
               src="/logo-light.png"
               alt="The Nook Bite"
-              width={110}
-              height={110}
-              className="block dark:hidden w-[110px] h-[110px] object-contain"
+              width={105}
+              height={105}
+              className="block dark:hidden w-[105px] h-[105px] object-contain"
               priority
             />
             <Image
               src="/logo-dark.png"
               alt="The Nook Bite"
-              width={110}
-              height={110}
-              className="hidden dark:block w-[110px] h-[110px] object-contain"
+              width={105}
+              height={105}
+              className="hidden dark:block w-[105px] h-[105px] object-contain"
               priority
             />
           </Link>

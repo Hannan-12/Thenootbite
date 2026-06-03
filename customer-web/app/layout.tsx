@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <FlyToCartProvider>
             <Navbar />
-            <main className="flex-1 pt-28">{children}</main>
+            <main className="flex-1 pt-[108px]">{children}</main>
 
             <footer className="bg-[#0a0a0a] border-t border-white/5">
               <div className="mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14">
