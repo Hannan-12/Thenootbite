@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { useCart } from '@/store/cart';
 import { useFlyToCart } from '@/components/FlyToCart';
@@ -49,21 +50,31 @@ export function Navbar() {
   return (
     <>
       <header
-        className={`sticky top-0 z-40 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-40 transition-colors duration-300 ${
           scrolled
             ? 'bg-surface/95 backdrop-blur-sm border-b border-theme shadow-sm'
             : 'bg-surface border-b border-theme'
         }`}
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-28 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 flex-shrink-0" onClick={() => setMenuOpen(false)}>
-            <div className="bg-brand-red text-white font-heading text-base px-3 py-1.5 leading-none tracking-wider">
-              TNB
-            </div>
-            <span className="font-heading text-sm text-primary tracking-[0.2em] hidden sm:block">
-              THE NOOK BITE
-            </span>
+          <Link href="/" className="flex items-center flex-shrink-0" onClick={() => setMenuOpen(false)}>
+            <Image
+              src="/logo-light.png"
+              alt="The Nook Bite"
+              width={110}
+              height={110}
+              className="block dark:hidden w-[110px] h-[110px] object-contain"
+              priority
+            />
+            <Image
+              src="/logo-dark.png"
+              alt="The Nook Bite"
+              width={110}
+              height={110}
+              className="hidden dark:block w-[110px] h-[110px] object-contain"
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}
