@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCart } from '@/store/cart';
 import { formatPKR } from '@/lib/format';
-import { createClient } from '@/lib/supabase/client';
 import { createOrder } from '@/lib/api';
+import { createClient } from '@/lib/supabase/client';
 
 const inputClass =
   'w-full bg-surface border border-theme px-4 py-3 focus:outline-none focus:border-brand-red/60 transition-colors text-sm font-body text-primary placeholder:text-muted rounded-sm';
@@ -15,19 +15,52 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { lines, totalPrice, clear } = useCart();
   const [mounted, setMounted]       = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userId, setUserId]         = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [name, setName]             = useState('');
+  const [phone, setPhone]           = useState('');
+  const [address, setAddress]       = useState('');
   const [table, setTable]           = useState('');
   const [notes, setNotes]           = useState('');
-  const [userId, setUserId]         = useState<string | null>(null);
+  const [tip, setTip]               = useState(0);
+  const [customTip, setCustomTip]   = useState('');
+  const [orderType, setOrderType]   = useState<'dine-in' | 'takeaway' | 'delivery'>('dine-in');
+
+  const tipAmount = tip === -1 ? (parseInt(customTip) || 0) : tip;
+  const grandTotal = totalPrice() + tipAmount;
 
   useEffect(() => {
     setMounted(true);
-    createClient().auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-  }, []);
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      const uid = data.user?.id ?? null;
+      if (!uid) {
+        router.replace('/login?next=/checkout');
+        return;
+      }
+      // Check profile exists
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone')
+        .eq('id', uid)
+        .single();
+      if (!profile?.full_name) {
+        // Profile incomplete — send to profile page to fill in
+        router.replace('/profile?next=/checkout');
+        return;
+      }
+      setUserId(uid);
+      setAuthChecked(true);
+    });
+  }, [router]);
 
-  if (!mounted) return null;
+  if (!mounted || !authChecked) return (
+    <div className="min-h-screen flex items-center justify-center bg-surface">
+      <p className="font-heading text-sm tracking-widest text-muted animate-pulse">LOADING…</p>
+    </div>
+  );
 
   if (lines.length === 0) {
     return (
@@ -64,7 +97,16 @@ export default function CheckoutPage() {
         user_id: userId,
       });
       clear();
-      router.push(`/order-confirmation?id=${order.id}&method=cash`);
+      const params = new URLSearchParams({
+        id: order.id,
+        method: 'cash',
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        tip: String(tipAmount),
+        type: orderType,
+      });
+      router.push(`/order-confirmation?${params.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
       setSubmitting(false);
@@ -79,6 +121,35 @@ export default function CheckoutPage() {
         <div className="grid gap-8 md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_340px]">
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Order type */}
+            <div>
+              <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-3">
+                ORDER TYPE <span className="text-brand-red">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'dine-in',   label: 'DINE IN',   icon: '🍽️' },
+                  { value: 'takeaway',  label: 'TAKEAWAY',  icon: '🥡' },
+                  { value: 'delivery',  label: 'DELIVERY',  icon: '🛵' },
+                ] as const).map(({ value, label, icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setOrderType(value)}
+                    className={`flex flex-col items-center gap-1.5 py-4 rounded-sm border transition-colors duration-150 ${
+                      orderType === value
+                        ? 'bg-brand-red/10 border-brand-red text-primary'
+                        : 'border-theme text-muted hover:border-brand-red/40 hover:text-primary'
+                    }`}
+                  >
+                    <span className="text-2xl">{icon}</span>
+                    <span className="font-heading text-xs tracking-widest">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
                 YOUR NAME <span className="text-brand-red">*</span>
@@ -93,15 +164,44 @@ export default function CheckoutPage() {
 
             <div>
               <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
-                TABLE NUMBER
+                PHONE NUMBER
               </label>
               <input
-                value={table}
-                onChange={(e) => setTable(e.target.value)}
-                placeholder="e.g. 7"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. 0300-1234567"
                 className={inputClass}
+                type="tel"
               />
             </div>
+
+            {orderType === 'delivery' && (
+              <div>
+                <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
+                  DELIVERY ADDRESS <span className="text-brand-red">*</span>
+                </label>
+                <input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Your delivery address"
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            {orderType === 'dine-in' && (
+              <div>
+                <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
+                  TABLE NUMBER
+                </label>
+                <input
+                  value={table}
+                  onChange={(e) => setTable(e.target.value)}
+                  placeholder="e.g. 7"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             <div>
               <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
@@ -116,12 +216,74 @@ export default function CheckoutPage() {
               />
             </div>
 
-            {/* Payment method — cash only */}
+            {/* Tip */}
+            <div>
+              <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-3">
+                ADD A TIP
+                <span className="text-white/20 font-body normal-case tracking-normal text-xs ml-2">
+                  {orderType === 'dine-in'  && '(given at table)'}
+                  {orderType === 'takeaway' && '(given at counter)'}
+                  {orderType === 'delivery' && '(given to rider)'}
+                </span>
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {[0, 50, 100, 200].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => { setTip(t); setCustomTip(''); }}
+                    className={`font-heading text-xs tracking-widest px-4 py-2.5 rounded-sm border transition-colors duration-150 ${
+                      tip === t && tip !== -1
+                        ? 'bg-brand-red border-brand-red text-white'
+                        : 'border-theme text-muted hover:border-brand-red/40 hover:text-primary'
+                    }`}
+                  >
+                    {t === 0 ? 'NO TIP' : `RS. ${t}`}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setTip(-1)}
+                  className={`font-heading text-xs tracking-widest px-4 py-2.5 rounded-sm border transition-colors duration-150 ${
+                    tip === -1
+                      ? 'bg-brand-red border-brand-red text-white'
+                      : 'border-theme text-muted hover:border-brand-red/40 hover:text-primary'
+                  }`}
+                >
+                  CUSTOM
+                </button>
+              </div>
+              {tip === -1 && (
+                <input
+                  type="number"
+                  min="0"
+                  value={customTip}
+                  onChange={(e) => setCustomTip(e.target.value)}
+                  placeholder="Enter tip amount (PKR)"
+                  className={`${inputClass} mt-2`}
+                />
+              )}
+              {tipAmount > 0 && (
+                <p className="text-xs text-brand-red font-heading tracking-wider mt-2">
+                  Tip: {formatPKR(tipAmount)} — Thank you!
+                </p>
+              )}
+            </div>
+
+            {/* Payment method — cash only, label changes by order type */}
             <div className="bg-card border border-theme rounded-sm px-4 py-4 flex items-center gap-3">
               <span className="text-2xl">💵</span>
               <div>
-                <p className="font-heading text-sm text-primary tracking-wider">CASH ON DELIVERY</p>
-                <p className="text-xs text-muted mt-0.5">Pay when your order arrives at your table.</p>
+                <p className="font-heading text-sm text-primary tracking-wider">
+                  {orderType === 'dine-in'  && 'CASH — PAY AT TABLE'}
+                  {orderType === 'takeaway' && 'CASH — PAY AT COUNTER'}
+                  {orderType === 'delivery' && 'CASH — PAY TO RIDER'}
+                </p>
+                <p className="text-xs text-muted mt-0.5">
+                  {orderType === 'dine-in'  && 'Pay when your order arrives at your table.'}
+                  {orderType === 'takeaway' && 'Pay at the counter when you collect your order.'}
+                  {orderType === 'delivery' && 'Pay the rider when your order is delivered.'}
+                </p>
               </div>
             </div>
 
@@ -157,9 +319,15 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
+            {tipAmount > 0 && (
+              <div className="px-6 py-3 border-t border-theme flex justify-between items-center">
+                <span className="font-heading text-xs tracking-wider text-muted">TIP</span>
+                <span className="font-heading text-sm text-muted">+{formatPKR(tipAmount)}</span>
+              </div>
+            )}
             <div className="px-6 py-4 border-t-2 border-brand-red flex justify-between items-center">
               <span className="font-heading text-sm tracking-wider text-primary">TOTAL</span>
-              <span className="font-heading text-2xl text-primary">{formatPKR(totalPrice())}</span>
+              <span className="font-heading text-2xl text-primary">{formatPKR(grandTotal)}</span>
             </div>
           </aside>
         </div>

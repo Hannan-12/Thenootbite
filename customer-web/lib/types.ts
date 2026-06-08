@@ -5,18 +5,22 @@ export type Category =
   | 'Burgers'
   | 'Food Bank'
   | 'Pastas'
-  | 'Pizza Regular'
+  | 'Pizza Regular v1'
   | 'Pizza Special'
-  | 'Rolls & Wraps';
+  | 'Rolls & Wraps'
+  | 'Sandwiches'
+  | 'Drinks & Desserts';
 
 export const CATEGORIES: Category[] = [
   'Appetizers',
   'Burgers',
   'Food Bank',
   'Pastas',
-  'Pizza Regular',
+  'Pizza Regular v1',
   'Pizza Special',
   'Rolls & Wraps',
+  'Sandwiches',
+  'Drinks & Desserts',
 ];
 
 // Raw row from menu_items (one row per SKU).

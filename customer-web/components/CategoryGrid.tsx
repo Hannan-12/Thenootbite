@@ -6,13 +6,15 @@ import { Reveal } from './Reveal';
 interface CatMeta { image: string; count: string; }
 
 const META: Record<Category, CatMeta> = {
-  Appetizers:       { image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=600&q=75', count: '12 items' },
-  Burgers:          { image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=75', count: '19 items' },
-  'Food Bank':      { image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=75', count: '27 items' },
-  Pastas:           { image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=600&q=75', count: '10 items' },
-  'Pizza Regular':  { image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=75', count: '24 items' },
-  'Pizza Special':  { image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?auto=format&fit=crop&w=600&q=75', count: '36 items' },
-  'Rolls & Wraps':  { image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=600&q=75', count: '11 items' },
+  Appetizers:          { image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=600&q=75', count: '12 items' },
+  Burgers:             { image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=75', count: '19 items' },
+  'Food Bank':         { image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=75', count: '27 items' },
+  Pastas:              { image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=600&q=75', count: '10 items' },
+  'Pizza Regular v1':  { image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=75', count: '24 items' },
+  'Pizza Special':     { image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?auto=format&fit=crop&w=600&q=75', count: '36 items' },
+  'Rolls & Wraps':     { image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=600&q=75', count: '11 items' },
+  Sandwiches:          { image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=75', count: '4 items'  },
+  'Drinks & Desserts': { image: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=600&q=75', count: '6 items'  },
 };
 
 export function CategoryGrid() {
@@ -37,6 +39,7 @@ export function CategoryGrid() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {CATEGORIES.map((cat, i) => {
             const meta = META[cat];
+            if (!meta) return null;
             return (
               <Reveal key={cat} direction="zoom" delay={(i % 4) * 60}>
                 <Link

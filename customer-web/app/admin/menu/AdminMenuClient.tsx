@@ -6,7 +6,7 @@ import { formatPKR } from '@/lib/format';
 
 type MenuItem = { id: string; sku: string; name: string; category: string; price: number; available: boolean };
 
-const CATEGORIES = ['All', 'Appetizers', 'Burgers', 'Food Bank', 'Pastas', 'Pizza Regular v1', 'Pizza Special', 'Rolls & Wraps'];
+const CATEGORIES = ['All', 'Appetizers', 'Burgers', 'Food Bank', 'Pastas', 'Pizza Regular v1', 'Pizza Special', 'Rolls & Wraps', 'Sandwiches', 'Drinks & Desserts'];
 
 export function AdminMenuClient({ initialItems }: { initialItems: MenuItem[] }) {
   const [items, setItems]     = useState<MenuItem[]>(initialItems);

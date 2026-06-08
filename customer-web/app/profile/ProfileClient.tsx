@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -20,6 +20,8 @@ export function ProfileClient({
   email: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get('next');
   const [name, setName]       = useState(initialName);
   const [phone, setPhone]     = useState(initialPhone);
   const [saving, setSaving]   = useState(false);
@@ -40,8 +42,12 @@ export function ProfileClient({
     setSaving(false);
     if (err) { setError(err.message); return; }
     setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-    router.refresh();
+    if (nextUrl) {
+      router.push(nextUrl);
+    } else {
+      setTimeout(() => setSaved(false), 2500);
+      router.refresh();
+    }
   }
 
   async function handleSignOut() {

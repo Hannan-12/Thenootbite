@@ -6,9 +6,10 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 const NAV = [
-  { href: '/admin',        label: 'DASHBOARD',  icon: '▦' },
-  { href: '/admin/orders', label: 'ORDERS',      icon: '◈' },
-  { href: '/admin/menu',   label: 'MENU',        icon: '◉' },
+  { href: '/admin',          label: 'DASHBOARD', icon: '▦' },
+  { href: '/admin/orders',   label: 'ORDERS',    icon: '◈' },
+  { href: '/admin/menu',     label: 'MENU',      icon: '◉' },
+  { href: '/admin/reports',  label: 'REPORTS',   icon: '▲' },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
