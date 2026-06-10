@@ -13,10 +13,11 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get('next') ?? '/profile';
 
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [showPass, setShowPass]   = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,14 +57,23 @@ function LoginForm() {
         <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
           PASSWORD
         </label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          required
-          className={inputClass}
-        />
+        <div className="relative">
+          <input
+            type={showPass ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPass(v => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors text-xs font-heading tracking-wider"
+          >
+            {showPass ? 'HIDE' : 'SHOW'}
+          </button>
+        </div>
       </div>
 
       {error && (

@@ -6,10 +6,11 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState<string | null>(null);
-  const [loading, setLoading]   = useState(false);
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [showPass, setShowPass]   = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [loading, setLoading]     = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,14 +62,23 @@ export default function AdminLoginPage() {
             required
             className={inputClass}
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className={inputClass}
-          />
+          <div className="relative">
+            <input
+              type={showPass ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors text-xs font-heading tracking-wider"
+            >
+              {showPass ? 'HIDE' : 'SHOW'}
+            </button>
+          </div>
 
           {error && (
             <p className="text-[#E4002B] text-xs font-body flex items-center gap-2">
