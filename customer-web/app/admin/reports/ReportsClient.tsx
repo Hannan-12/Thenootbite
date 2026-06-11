@@ -4,20 +4,19 @@ import { useState } from 'react';
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  ResponsiveContainer,
 } from 'recharts';
 
-type DayRow     = { date: string; label: string; revenue: number; orders: number };
-type MonthRow   = { month: string; label: string; revenue: number; orders: number };
-type Stats      = {
+type DayRow   = { date: string; label: string; revenue: number; orders: number };
+type MonthRow = { month: string; label: string; revenue: number; orders: number };
+type TopItem  = { name: string; qty: number; revenue: number };
+type Stats    = {
   totalRevenueToday: number; totalOrdersToday: number;
   totalRevenue30: number;    totalOrders30: number;
   thisMonth?: MonthRow;      lastMonth?: MonthRow;
 };
 
-function formatPKR(n: number) {
-  return 'Rs. ' + n.toLocaleString('en-PK');
-}
+function formatPKR(n: number) { return 'Rs. ' + n.toLocaleString('en-PK'); }
 
 function pct(a: number, b: number) {
   if (!b) return null;
@@ -34,12 +33,12 @@ const TOOLTIP_STYLE = {
   color: '#fff',
 };
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { dataKey: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={TOOLTIP_STYLE} className="px-3 py-2 space-y-1">
       <p className="text-white/40 text-[10px] tracking-widest mb-1">{label}</p>
-      {payload.map((p: any) => (
+      {payload.map(p => (
         <p key={p.dataKey} style={{ color: p.color }} className="text-xs font-heading tracking-wider">
           {p.dataKey === 'revenue' ? formatPKR(p.value) : `${p.value} orders`}
         </p>
@@ -48,12 +47,38 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function ReportsClient({ dailyRows, monthlyRows, stats }: {
+function downloadCSV(rows: Array<{ label: string; revenue: number; orders: number }>, filename: string) {
+  const header = 'Period,Orders,Revenue (PKR),Avg Order (PKR)';
+  const lines = rows.map(r => {
+    const avg = r.orders ? Math.round(r.revenue / r.orders) : 0;
+    return `"${r.label}",${r.orders},${r.revenue},${avg}`;
+  });
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadItemsCSV(items: TopItem[]) {
+  const header = 'Item,Qty Sold,Revenue (PKR)';
+  const lines  = items.map(i => `"${i.name}",${i.qty},${i.revenue}`);
+  const csv    = [header, ...lines].join('\n');
+  const blob   = new Blob([csv], { type: 'text/csv' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href = url; a.download = 'top-items.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function ReportsClient({ dailyRows, monthlyRows, topItems, stats }: {
   dailyRows: DayRow[];
   monthlyRows: MonthRow[];
+  topItems: TopItem[];
   stats: Stats;
 }) {
-  const [tab, setTab] = useState<'daily' | 'monthly'>('daily');
+  const [tab, setTab]       = useState<'daily' | 'monthly'>('daily');
   const [metric, setMetric] = useState<'revenue' | 'orders'>('revenue');
 
   const revChange = pct(stats.thisMonth?.revenue ?? 0, stats.lastMonth?.revenue ?? 0);
@@ -62,19 +87,30 @@ export function ReportsClient({ dailyRows, monthlyRows, stats }: {
   const rows: Array<{ label: string; revenue: number; orders: number }> =
     tab === 'daily' ? dailyRows : monthlyRows;
 
-  // Best day / month
   const best = [...rows].sort((a, b) => b.revenue - a.revenue)[0];
-  const avg  = rows.length ? Math.round(rows.reduce((s, r) => s + r.revenue, 0) / rows.filter(r => r.orders > 0).length || 0) : 0;
+  const avg  = rows.length
+    ? Math.round(rows.reduce((s, r) => s + r.revenue, 0) / (rows.filter(r => r.orders > 0).length || 1))
+    : 0;
+
+  const maxQty = topItems[0]?.qty ?? 1;
 
   return (
     <div className="px-4 sm:px-8 py-8 space-y-8">
       {/* Header */}
-      <div>
-        <p className="font-heading text-xs tracking-[0.4em] text-[#E4002B] mb-1">ANALYTICS</p>
-        <h1 className="font-heading text-3xl text-white">SALES REPORTS</h1>
-        <p className="text-white/30 text-xs mt-1">
-          {new Date().toLocaleDateString('en-PK', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-heading text-xs tracking-[0.4em] text-[#E4002B] mb-1">ANALYTICS</p>
+          <h1 className="font-heading text-3xl text-white">SALES REPORTS</h1>
+          <p className="text-white/30 text-xs mt-1">
+            {new Date().toLocaleDateString('en-PK', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        <button
+          onClick={() => downloadCSV(tab === 'daily' ? dailyRows : monthlyRows, `${tab}-report.csv`)}
+          className="font-heading text-xs tracking-widest px-4 py-2 border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-sm transition-colors"
+        >
+          ↓ EXPORT CSV
+        </button>
       </div>
 
       {/* KPI cards */}
@@ -119,7 +155,7 @@ export function ReportsClient({ dailyRows, monthlyRows, stats }: {
         </div>
       </div>
 
-      {/* Chart controls */}
+      {/* Chart */}
       <div className="bg-[#111] border border-white/5 rounded-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1.5">
@@ -143,7 +179,6 @@ export function ReportsClient({ dailyRows, monthlyRows, stats }: {
             ))}
           </div>
         </div>
-
         <div className="p-4 sm:p-6">
           <ResponsiveContainer width="100%" height={300}>
             {metric === 'revenue' ? (
@@ -177,7 +212,7 @@ export function ReportsClient({ dailyRows, monthlyRows, stats }: {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-[#111] border border-white/5 rounded-sm px-5 py-5">
           <p className="font-heading text-[10px] tracking-widest text-white/30 mb-2">
-            BEST {tab === 'daily' ? 'DAY' : 'MONTH'} (30{tab === 'daily' ? 'd' : ' mo'})
+            BEST {tab === 'daily' ? 'DAY' : 'MONTH'}
           </p>
           <p className="font-heading text-lg text-white">{best?.label ?? '—'}</p>
           <p className="font-heading text-xs text-[#E4002B] mt-1">{best ? formatPKR(best.revenue) : ''}</p>
@@ -194,7 +229,46 @@ export function ReportsClient({ dailyRows, monthlyRows, stats }: {
         </div>
       </div>
 
-      {/* Monthly report table */}
+      {/* Top 10 items */}
+      <div className="bg-[#111] border border-white/5 rounded-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+          <h2 className="font-heading text-xs tracking-widest text-white/60">TOP 10 ITEMS — LAST 30 DAYS</h2>
+          <button
+            onClick={() => downloadItemsCSV(topItems)}
+            className="font-heading text-[10px] tracking-widest text-white/20 hover:text-white transition-colors"
+          >
+            ↓ CSV
+          </button>
+        </div>
+        {topItems.length === 0 ? (
+          <div className="px-5 py-12 text-center text-white/20 font-heading text-xs tracking-wider">
+            NO ORDERS IN LAST 30 DAYS
+          </div>
+        ) : (
+          <div className="divide-y divide-white/5">
+            {topItems.map((item, i) => (
+              <div key={item.name} className="flex items-center gap-4 px-5 py-3">
+                <span className="font-heading text-xs text-white/20 w-5 flex-shrink-0">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-heading text-sm text-white truncate">{item.name}</p>
+                  <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#E4002B] rounded-full"
+                      style={{ width: `${Math.round((item.qty / maxQty) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex-shrink-0 text-right">
+                  <p className="font-heading text-sm text-white">{item.qty} sold</p>
+                  <p className="font-heading text-xs text-white/30">{formatPKR(item.revenue)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Monthly breakdown table */}
       <div className="bg-[#111] border border-white/5 rounded-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-white/5">
           <h2 className="font-heading text-xs tracking-widest text-white/60">MONTHLY BREAKDOWN</h2>

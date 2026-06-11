@@ -9,23 +9,24 @@ export default async function ReportsPage() {
   await requireAdmin();
   const db = createServiceClient();
 
-  // Last 30 days daily data
   const from30 = new Date();
   from30.setDate(from30.getDate() - 29);
   from30.setHours(0, 0, 0, 0);
 
-  // Last 12 months data
   const from12 = new Date();
   from12.setMonth(from12.getMonth() - 11);
   from12.setDate(1);
   from12.setHours(0, 0, 0, 0);
 
-  const [{ data: dailyRaw }, { data: monthlyRaw }] = await Promise.all([
+  const [{ data: dailyRaw }, { data: monthlyRaw }, { data: itemsRaw }] = await Promise.all([
     db.from('orders').select('total, created_at').gte('created_at', from30.toISOString()),
     db.from('orders').select('total, created_at').gte('created_at', from12.toISOString()),
+    db.from('order_items')
+      .select('item_name, item_price, quantity')
+      .gte('created_at', from30.toISOString()),
   ]);
 
-  // Build daily rows
+  // Daily rows
   const dailyMap: Record<string, { revenue: number; orders: number }> = {};
   for (let i = 0; i < 30; i++) {
     const d = new Date(from30);
@@ -44,7 +45,7 @@ export default async function ReportsPage() {
     orders: v.orders,
   }));
 
-  // Build monthly rows
+  // Monthly rows
   const monthlyMap: Record<string, { revenue: number; orders: number }> = {};
   for (let i = 0; i < 12; i++) {
     const d = new Date(from12);
@@ -63,6 +64,19 @@ export default async function ReportsPage() {
     orders: v.orders,
   }));
 
+  // Top items (last 30 days)
+  const itemMap: Record<string, { qty: number; revenue: number }> = {};
+  for (const i of itemsRaw ?? []) {
+    const name = i.item_name;
+    if (!itemMap[name]) itemMap[name] = { qty: 0, revenue: 0 };
+    itemMap[name].qty     += i.quantity;
+    itemMap[name].revenue += i.item_price * i.quantity;
+  }
+  const topItems = Object.entries(itemMap)
+    .map(([name, v]) => ({ name, qty: v.qty, revenue: v.revenue }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 10);
+
   // Summary stats
   const totalRevenueToday = dailyRows.at(-1)?.revenue ?? 0;
   const totalOrdersToday  = dailyRows.at(-1)?.orders ?? 0;
@@ -76,6 +90,7 @@ export default async function ReportsPage() {
       <ReportsClient
         dailyRows={dailyRows}
         monthlyRows={monthlyRows}
+        topItems={topItems}
         stats={{ totalRevenueToday, totalOrdersToday, totalRevenue30, totalOrders30, thisMonth, lastMonth }}
       />
     </AdminShell>
