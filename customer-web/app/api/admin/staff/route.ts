@@ -54,31 +54,59 @@ export async function POST(req: NextRequest) {
   // Send welcome email via Resend
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://thenookbite.com';
+    const emailDomain = process.env.EMAIL_DOMAIN ?? 'thenookbite.com';
+    const resolvedRole = role ?? 'cashier';
+    const resolvedStaffType = staff_type ?? 'pos';
+    const isPOS = resolvedStaffType === 'pos';
+
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
       body: JSON.stringify({
-        from: `TNB <noreply@${process.env.EMAIL_DOMAIN ?? 'thenookbite.com'}>`,
+        from: `TNB <noreply@${emailDomain}>`,
         to: [email],
-        subject: 'Your TNB Staff Account',
+        subject: 'Your TNB Staff Account — Credentials Inside',
         html: `
-          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0d0d0d;color:#fff;padding:32px;border-radius:4px">
-            <div style="background:#E4002B;color:#fff;font-weight:700;font-size:16px;padding:6px 12px;display:inline-block;letter-spacing:2px;margin-bottom:24px">TNB</div>
-            <h2 style="margin:0 0 8px;font-size:22px">Welcome, ${full_name}!</h2>
-            <p style="color:#aaa;margin:0 0 24px">Your staff account has been created. Use the details below to sign in to the POS terminal.</p>
-            <div style="background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:20px;margin-bottom:24px">
-              <p style="margin:0 0 8px;font-size:13px;color:#aaa">EMAIL</p>
-              <p style="margin:0 0 16px;font-weight:600">${email}</p>
-              <p style="margin:0 0 8px;font-size:13px;color:#aaa">PASSWORD</p>
-              <p style="margin:0 0 16px;font-weight:600;font-size:18px;letter-spacing:2px">${password}</p>
-              <p style="margin:0 0 8px;font-size:13px;color:#aaa">ROLE</p>
-              <p style="margin:0;font-weight:600;text-transform:uppercase">${role ?? 'cashier'}</p>
+          <div style="font-family:sans-serif;max-width:500px;margin:0 auto;background:#0d0d0d;color:#fff;padding:36px;border-radius:6px">
+            <div style="background:#E4002B;color:#fff;font-weight:700;font-size:16px;padding:6px 14px;display:inline-block;letter-spacing:3px;margin-bottom:28px">TNB</div>
+            <h2 style="margin:0 0 6px;font-size:24px;font-weight:700">Welcome, ${full_name}!</h2>
+            <p style="color:#888;margin:0 0 28px;font-size:14px">Your staff account at The Nook Bite has been created. Keep these credentials safe.</p>
+
+            <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:24px;margin-bottom:24px">
+
+              ${isPOS ? `
+              <p style="margin:0 0 4px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:2px">POS LOGIN EMAIL</p>
+              <p style="margin:0 0 20px;font-weight:600;font-size:15px;color:#fff">${email}</p>
+
+              <p style="margin:0 0 4px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:2px">POS LOGIN PASSWORD</p>
+              <p style="margin:0 0 20px;font-weight:700;font-size:22px;letter-spacing:4px;color:#E4002B;background:#1f0000;padding:10px 16px;border-radius:4px;display:inline-block">${password}</p>
+              ` : ''}
+
+              <p style="margin:0 0 4px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:2px">CHECK-IN PIN</p>
+              <p style="margin:0 0 4px;font-weight:700;font-size:32px;letter-spacing:10px;color:#FFD700;background:#1a1600;padding:12px 20px;border-radius:4px;display:inline-block">${pin ?? '----'}</p>
+              <p style="margin:8px 0 20px;font-size:12px;color:#555">Enter this PIN on the shared tablet at the entrance to check in and out each day.</p>
+
+              <p style="margin:0 0 4px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:2px">ROLE</p>
+              <p style="margin:0 0 4px;font-weight:600;text-transform:uppercase;color:#fff">${resolvedRole}</p>
+              <p style="margin:0;font-size:12px;color:#555;text-transform:uppercase">${resolvedStaffType === 'pos' ? 'POS Staff' : 'Non-POS Staff'}</p>
             </div>
-            <a href="${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://thenookbite.com'}/pos/login"
-               style="background:#E4002B;color:#fff;text-decoration:none;padding:12px 24px;font-weight:700;letter-spacing:2px;font-size:13px;border-radius:4px;display:inline-block">
+
+            ${isPOS ? `
+            <a href="${siteUrl}/pos/login"
+               style="background:#E4002B;color:#fff;text-decoration:none;padding:14px 28px;font-weight:700;letter-spacing:2px;font-size:13px;border-radius:4px;display:inline-block;margin-bottom:16px">
               OPEN POS TERMINAL →
             </a>
-            <p style="color:#555;font-size:12px;margin-top:24px">Please change your password after first login.</p>
+            ` : ''}
+
+            <a href="${siteUrl}/checkin"
+               style="background:#1a1a1a;color:#FFD700;text-decoration:none;padding:14px 28px;font-weight:700;letter-spacing:2px;font-size:13px;border-radius:4px;display:inline-block;border:1px solid #333;margin-bottom:24px${isPOS ? ';margin-left:8px' : ''}">
+              CHECK-IN TABLET →
+            </a>
+
+            <p style="color:#444;font-size:12px;border-top:1px solid #1f1f1f;padding-top:16px;margin:0">
+              The Nook Bite · Do not share your credentials or PIN with anyone.
+            </p>
           </div>
         `,
       }),
