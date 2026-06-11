@@ -1,16 +1,21 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { formatPKR } from '@/lib/format';
+
+const UNITS = ['g', 'kg', 'ml', 'L', 'pcs', 'tbsp', 'tsp', 'cup'];
 
 type MenuItem = {
   id: string; sku: string; name: string; category: string;
   price: number; description: string | null; image_url: string | null;
   available: boolean; deal_price: number | null; deal_label: string | null;
 };
+
+interface Ingredient { id: string; name: string; unit: string; }
+interface RecipeLine { id: string; quantity: number; ingredient_id: string; ingredients: Ingredient; }
 
 const inputClass = 'w-full bg-[#1a1a1a] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#E4002B]/50 transition-colors rounded-sm';
 const labelClass = 'font-heading text-xs tracking-widest text-white/40 block mb-2';
@@ -30,6 +35,20 @@ export function MenuItemEditor({ item }: { item: MenuItem }) {
   const [saving, setSaving]         = useState(false);
   const [toast, setToast]           = useState<string | null>(null);
   const [toastType, setToastType]   = useState<'success' | 'error'>('success');
+
+  // Recipe state
+  const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
+  const [recipe, setRecipe]                 = useState<RecipeLine[]>([]);
+  const [recipeLoaded, setRecipeLoaded]     = useState(false);
+  const [showRecipe, setShowRecipe]         = useState(false);
+  const [addIngId, setAddIngId]             = useState('');
+  const [addQty, setAddQty]                 = useState('');
+  const [addIngLoading, setAddIngLoading]   = useState(false);
+  // New ingredient inline
+  const [showNewIng, setShowNewIng]         = useState(false);
+  const [newIngName, setNewIngName]         = useState('');
+  const [newIngUnit, setNewIngUnit]         = useState('g');
+  const [newIngLoading, setNewIngLoading]   = useState(false);
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast(msg);
@@ -83,6 +102,74 @@ export function MenuItemEditor({ item }: { item: MenuItem }) {
     } else {
       showToast('Save failed', 'error');
     }
+  }
+
+  async function loadRecipe() {
+    if (recipeLoaded) return;
+    const [ingRes, recipeRes] = await Promise.all([
+      fetch('/api/admin/ingredients'),
+      fetch(`/api/admin/recipes?menu_item_id=${item.id}`),
+    ]);
+    if (ingRes.ok) setAllIngredients(await ingRes.json());
+    if (recipeRes.ok) setRecipe(await recipeRes.json());
+    setRecipeLoaded(true);
+  }
+
+  async function toggleRecipe() {
+    if (!recipeLoaded) await loadRecipe();
+    setShowRecipe(v => !v);
+  }
+
+  async function addToRecipe(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addIngId || !addQty) return;
+    setAddIngLoading(true);
+    const res = await fetch('/api/admin/recipes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ menu_item_id: item.id, ingredient_id: addIngId, quantity: parseFloat(addQty) }),
+    });
+    const data = await res.json();
+    setAddIngLoading(false);
+    if (!res.ok) { showToast(data.detail ?? 'Failed', 'error'); return; }
+    setRecipe(prev => {
+      const exists = prev.find(r => r.ingredient_id === addIngId);
+      return exists ? prev.map(r => r.ingredient_id === addIngId ? data : r) : [...prev, data];
+    });
+    setAddIngId(''); setAddQty('');
+  }
+
+  async function removeFromRecipe(recipeId: string) {
+    const res = await fetch(`/api/admin/recipes/${recipeId}`, { method: 'DELETE' });
+    if (res.ok) setRecipe(prev => prev.filter(r => r.id !== recipeId));
+  }
+
+  async function updateQty(recipeId: string, quantity: number) {
+    await fetch(`/api/admin/recipes/${recipeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity }),
+    });
+    setRecipe(prev => prev.map(r => r.id === recipeId ? { ...r, quantity } : r));
+  }
+
+  async function createIngredient(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newIngName.trim()) return;
+    setNewIngLoading(true);
+    const res = await fetch('/api/admin/ingredients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newIngName.trim(), unit: newIngUnit }),
+    });
+    const data = await res.json();
+    setNewIngLoading(false);
+    if (!res.ok) { showToast(data.detail ?? 'Failed', 'error'); return; }
+    setAllIngredients(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setAddIngId(data.id);
+    setNewIngName(''); setNewIngUnit('g');
+    setShowNewIng(false);
+    showToast(`"${data.name}" created`);
   }
 
   return (
@@ -218,6 +305,130 @@ export function MenuItemEditor({ item }: { item: MenuItem }) {
       >
         {saving ? 'SAVING…' : 'SAVE CHANGES →'}
       </button>
+
+      {/* ── Recipe Section ── */}
+      <div className="mt-6 border border-white/5 rounded-sm overflow-hidden">
+        <button
+          onClick={toggleRecipe}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="font-heading text-sm text-white tracking-wider">RECIPE</span>
+            {recipe.length > 0 && (
+              <span className="font-heading text-[10px] tracking-widest px-2 py-0.5 border border-white/10 text-white/30 rounded-sm">
+                {recipe.length} INGREDIENT{recipe.length !== 1 ? 'S' : ''}
+              </span>
+            )}
+          </div>
+          <span className="font-heading text-xs text-white/30">{showRecipe ? '▲' : '▼'}</span>
+        </button>
+
+        {showRecipe && (
+          <div className="border-t border-white/5">
+            {/* Existing recipe lines */}
+            {recipe.length > 0 && (
+              <div className="divide-y divide-white/5">
+                {recipe.map(line => (
+                  <div key={line.id} className="flex items-center justify-between px-5 py-3">
+                    <div>
+                      <p className="font-heading text-xs text-white">{line.ingredients.name}</p>
+                      <p className="font-heading text-[10px] text-white/30 mt-0.5 uppercase">{line.ingredients.unit}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        defaultValue={line.quantity}
+                        onBlur={e => {
+                          const val = parseFloat(e.target.value);
+                          if (val > 0 && val !== line.quantity) updateQty(line.id, val);
+                        }}
+                        className="w-20 bg-[#1a1a1a] border border-white/10 px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-[#E4002B]/40 rounded-sm font-body"
+                      />
+                      <button
+                        onClick={() => removeFromRecipe(line.id)}
+                        className="font-heading text-[10px] text-white/20 hover:text-red-400 px-2 py-1 border border-transparent hover:border-red-500/20 rounded-sm transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add ingredient form */}
+            <div className="px-5 py-4 bg-[#0d0d0d] border-t border-white/5">
+              <p className="font-heading text-[10px] tracking-widest text-white/30 mb-3">ADD INGREDIENT</p>
+              <form onSubmit={addToRecipe} className="flex gap-2">
+                <select
+                  value={addIngId}
+                  onChange={e => setAddIngId(e.target.value)}
+                  required
+                  className="flex-1 bg-[#1a1a1a] border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-[#E4002B]/40 rounded-sm font-body cursor-pointer"
+                >
+                  <option value="">Select ingredient…</option>
+                  {allIngredients.map(i => (
+                    <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={addQty}
+                  onChange={e => setAddQty(e.target.value)}
+                  placeholder="Qty"
+                  required
+                  className="w-20 bg-[#1a1a1a] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#E4002B]/40 rounded-sm font-body"
+                />
+                <button
+                  type="submit"
+                  disabled={addIngLoading}
+                  className="font-heading text-[10px] tracking-widest px-4 py-2 bg-[#E4002B] text-white hover:bg-red-700 disabled:opacity-50 rounded-sm transition-colors flex-shrink-0"
+                >
+                  {addIngLoading ? '…' : 'ADD'}
+                </button>
+              </form>
+
+              {/* Create new ingredient inline */}
+              <button
+                onClick={() => setShowNewIng(v => !v)}
+                className="mt-2 font-heading text-[10px] tracking-widest text-white/20 hover:text-white transition-colors"
+              >
+                {showNewIng ? '− cancel' : '+ new ingredient'}
+              </button>
+
+              {showNewIng && (
+                <form onSubmit={createIngredient} className="mt-2 flex gap-2">
+                  <input
+                    value={newIngName}
+                    onChange={e => setNewIngName(e.target.value)}
+                    placeholder="Ingredient name"
+                    required
+                    className="flex-1 bg-[#1a1a1a] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#E4002B]/40 rounded-sm font-body"
+                  />
+                  <select
+                    value={newIngUnit}
+                    onChange={e => setNewIngUnit(e.target.value)}
+                    className="w-20 bg-[#1a1a1a] border border-white/10 px-2 py-2 text-xs text-white focus:outline-none focus:border-[#E4002B]/40 rounded-sm font-body cursor-pointer"
+                  >
+                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={newIngLoading}
+                    className="font-heading text-[10px] tracking-widest px-4 py-2 border border-white/10 text-white/40 hover:text-white hover:border-white/30 disabled:opacity-50 rounded-sm transition-colors flex-shrink-0"
+                  >
+                    {newIngLoading ? '…' : 'CREATE'}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
