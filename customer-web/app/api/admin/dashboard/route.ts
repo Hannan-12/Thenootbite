@@ -52,5 +52,18 @@ export async function GET() {
       .sort((a, b) => b.count - a.count);
   }
 
-  return NextResponse.json({ orders: allOrders, staffStats, itemsSold });
+  // Low stock ingredients
+  const { data: lowStockItems } = await db
+    .from('ingredients')
+    .select('id, name, unit, stock_qty, low_stock_threshold')
+    .filter('stock_qty', 'lte', db.from('ingredients').select('low_stock_threshold'));
+
+  // Simple approach: fetch all and filter in JS
+  const { data: allIngredients } = await db
+    .from('ingredients')
+    .select('id, name, unit, stock_qty, low_stock_threshold');
+
+  const lowStock = (allIngredients ?? []).filter(i => i.stock_qty <= i.low_stock_threshold);
+
+  return NextResponse.json({ orders: allOrders, staffStats, itemsSold, lowStock });
 }

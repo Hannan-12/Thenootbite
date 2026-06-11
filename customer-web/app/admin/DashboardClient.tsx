@@ -18,10 +18,19 @@ interface StaffStat {
   count: number;
 }
 
+interface LowStockItem {
+  id: string;
+  name: string;
+  unit: string;
+  stock_qty: number;
+  low_stock_threshold: number;
+}
+
 interface DashboardData {
   orders: Order[];
   staffStats: StaffStat[];
   itemsSold: number;
+  lowStock: LowStockItem[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,7 +59,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
     return () => clearInterval(id);
   }, [refresh]);
 
-  const { orders, staffStats, itemsSold } = data;
+  const { orders, staffStats, itemsSold, lowStock = [] } = data;
 
   const counts = {
     pending:   orders.filter(o => o.status === 'pending').length,
@@ -149,6 +158,33 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
           )}
         </div>
       </div>
+
+      {/* Low stock alert */}
+      {lowStock.length > 0 && (
+        <div className="mb-6 border border-yellow-500/30 bg-yellow-500/5 rounded-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-yellow-500/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-400 text-sm">⚠</span>
+              <h2 className="font-heading text-xs tracking-widest text-yellow-400">
+                LOW STOCK — {lowStock.length} INGREDIENT{lowStock.length !== 1 ? 'S' : ''}
+              </h2>
+            </div>
+            <Link href="/admin/inventory" className="font-heading text-[10px] tracking-widest text-yellow-400/60 hover:text-yellow-400 transition-colors">
+              MANAGE →
+            </Link>
+          </div>
+          <div className="divide-y divide-yellow-500/10">
+            {lowStock.map(item => (
+              <div key={item.id} className="flex items-center justify-between px-5 py-2.5">
+                <span className="font-heading text-xs text-yellow-300">{item.name}</span>
+                <span className="font-heading text-xs text-yellow-400/60">
+                  {item.stock_qty} / {item.low_stock_threshold} {item.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent orders */}
       <div className="border border-white/5 rounded-sm overflow-hidden">

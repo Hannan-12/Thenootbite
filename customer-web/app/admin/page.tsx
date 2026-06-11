@@ -12,7 +12,7 @@ export default async function AdminDashboard() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [ordersRes, itemsRes] = await Promise.all([
+  const [ordersRes, itemsRes, ingredientsRes] = await Promise.all([
     db
       .from('orders')
       .select('id, status, total, created_at, staff_id')
@@ -22,11 +22,17 @@ export default async function AdminDashboard() {
       .from('order_items')
       .select('quantity, orders!inner(created_at)')
       .gte('orders.created_at', today.toISOString()),
+    db
+      .from('ingredients')
+      .select('id, name, unit, stock_qty, low_stock_threshold'),
   ]);
 
   const orders = ordersRes.data ?? [];
   const itemsSold = (itemsRes.data ?? []).reduce(
     (s: number, i: { quantity: number }) => s + i.quantity, 0
+  );
+  const lowStock = (ingredientsRes.data ?? []).filter(
+    i => i.stock_qty <= i.low_stock_threshold
   );
 
   // Staff stats
@@ -54,7 +60,7 @@ export default async function AdminDashboard() {
 
   return (
     <AdminShell>
-      <DashboardClient initial={{ orders, staffStats, itemsSold }} />
+      <DashboardClient initial={{ orders, staffStats, itemsSold, lowStock }} />
     </AdminShell>
   );
 }

@@ -53,6 +53,54 @@ export async function POST(req: NextRequest) {
 
   await db.from('order_items').insert(itemRows);
 
+  // Auto-deduct stock based on recipes (fire-and-forget — don't fail the order if this errors)
+  try {
+    const menuItemIds = items
+      .map((i: { menu_item_id?: string; quantity: number }) => i.menu_item_id)
+      .filter(Boolean) as string[];
+
+    if (menuItemIds.length > 0) {
+      const { data: recipes } = await db
+        .from('recipes')
+        .select('ingredient_id, quantity, menu_item_id')
+        .in('menu_item_id', menuItemIds);
+
+      if (recipes?.length) {
+        // Aggregate deductions per ingredient across all order items
+        const deductions: Record<string, number> = {};
+        for (const item of items as { menu_item_id?: string; quantity: number }[]) {
+          if (!item.menu_item_id) continue;
+          const itemRecipes = recipes.filter(r => r.menu_item_id === item.menu_item_id);
+          for (const r of itemRecipes) {
+            deductions[r.ingredient_id] = (deductions[r.ingredient_id] ?? 0) + r.quantity * item.quantity;
+          }
+        }
+
+        // Deduct from each ingredient
+        for (const [ingredientId, amount] of Object.entries(deductions)) {
+          const { data: ing } = await db
+            .from('ingredients')
+            .select('stock_qty')
+            .eq('id', ingredientId)
+            .single();
+
+          if (ing) {
+            const newQty = Math.max(0, ing.stock_qty - amount);
+            await db.from('ingredients').update({ stock_qty: newQty, updated_at: new Date().toISOString() }).eq('id', ingredientId);
+            await db.from('stock_movements').insert({
+              ingredient_id: ingredientId,
+              qty_change: -amount,
+              reason: 'order',
+              order_id: order.id,
+            });
+          }
+        }
+      }
+    }
+  } catch (_) {
+    // Stock deduction failure must never block order creation
+  }
+
   return NextResponse.json(order, { status: 201 });
 }
 
