@@ -9,6 +9,7 @@ export interface OrderItemPayload {
 
 export interface CreateOrderPayload {
   customer_name: string;
+  customer_phone: string;
   table_number?: string | null;
   special_notes?: string | null;
   payment_method: 'cash';

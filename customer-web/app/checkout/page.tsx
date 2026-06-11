@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCart } from '@/store/cart';
-import { formatPKR } from '@/lib/format';
+import { formatPKR, isValidPakistaniPhone, normalizePhone } from '@/lib/format';
 import { createOrder } from '@/lib/api';
 import { createClient } from '@/lib/supabase/client';
 
@@ -84,12 +84,18 @@ export default function CheckoutPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { setError('Please enter your name.'); return; }
+    const normalizedPhone = normalizePhone(phone);
+    if (!isValidPakistaniPhone(normalizedPhone)) {
+      setError('Please enter a valid Pakistani mobile number starting with 03 (e.g. 03001234567).');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
     try {
       const order = await createOrder({
         customer_name: name.trim(),
+        customer_phone: normalizedPhone,
         table_number: table.trim() || null,
         special_notes: notes.trim() || null,
         payment_method: 'cash',
@@ -164,15 +170,23 @@ export default function CheckoutPage() {
 
             <div>
               <label className="font-heading text-xs tracking-[0.25em] text-muted block mb-2">
-                PHONE NUMBER
+                PHONE NUMBER <span className="text-brand-red">*</span>
+                <span className="text-muted/50 font-body normal-case tracking-normal text-xs ml-1">(Pakistani mobile: 03XXXXXXXXX)</span>
               </label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. 0300-1234567"
-                className={inputClass}
-                type="tel"
-              />
+              <div className="relative">
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="03001234567"
+                  className={inputClass}
+                  type="tel"
+                  maxLength={11}
+                  required
+                />
+                {isValidPakistaniPhone(normalizePhone(phone)) && (
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>
+                )}
+              </div>
             </div>
 
             {orderType === 'delivery' && (

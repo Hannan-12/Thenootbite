@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { CATEGORIES, type Category, type MenuCard } from '@/lib/types';
-import { formatPKR } from '@/lib/format';
+import { formatPKR, isValidPakistaniPhone, normalizePhone } from '@/lib/format';
 import { imageForItem } from '@/lib/itemImages';
 import { createClient } from '@/lib/supabase/client';
 
@@ -13,6 +13,15 @@ interface CartLine {
   price: number;
   quantity: number;
   menu_item_id: string;
+}
+
+interface PastOrder {
+  id: string;
+  customer_name: string;
+  total: number;
+  status: string;
+  created_at: string;
+  order_items: { item_name: string; quantity: number; item_price: number }[];
 }
 
 type OrderType = 'dine-in' | 'takeaway';
@@ -42,12 +51,49 @@ export function POSTerminal({
   const [orderType, setOrderType]   = useState<OrderType>('dine-in');
   const [table, setTable]           = useState('');
   const [customer, setCustomer]     = useState('');
+  const [phone, setPhone]           = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [pastOrders, setPastOrders] = useState<PastOrder[]>([]);
+  const [lookingUp, setLookingUp]   = useState(false);
   const [notes, setNotes]           = useState('');
   const [payment, setPayment]       = useState<PaymentMethod>('cash');
   const [placing, setPlacing]       = useState(false);
   const [lastOrder, setLastOrder]   = useState<{ id: string; total: number } | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
   const searchRef                   = useRef<HTMLInputElement>(null);
+  const lookupTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Phone lookup ─────────────────────────────────────────────────────────────
+  const lookupPhone = useCallback(async (raw: string) => {
+    const normalized = normalizePhone(raw);
+    if (!isValidPakistaniPhone(normalized)) {
+      setPastOrders([]);
+      return;
+    }
+    setLookingUp(true);
+    const res = await fetch(`/api/customer-lookup?phone=${normalized}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.customer_name && !customer) setCustomer(data.customer_name);
+      setPastOrders(data.orders ?? []);
+    }
+    setLookingUp(false);
+  }, [customer]);
+
+  function handlePhoneChange(raw: string) {
+    setPhone(raw);
+    setPhoneError(null);
+    const normalized = normalizePhone(raw);
+    if (normalized.length === 11) {
+      if (!isValidPakistaniPhone(normalized)) {
+        setPhoneError('Must start with 03 and be 11 digits');
+        setPastOrders([]);
+        return;
+      }
+    }
+    if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    lookupTimer.current = setTimeout(() => lookupPhone(raw), 500);
+  }
 
   // ── Filter cards ────────────────────────────────────────────────────────────
   const filtered = cards.filter(c => {
@@ -77,6 +123,9 @@ export function POSTerminal({
     setCart([]);
     setTable('');
     setCustomer('');
+    setPhone('');
+    setPhoneError(null);
+    setPastOrders([]);
     setNotes('');
     setOrderType('dine-in');
     setPayment('cash');
@@ -87,6 +136,12 @@ export function POSTerminal({
   // ── Place order ───────────────────────────────────────────────────────────────
   async function placeOrder() {
     if (!cart.length) return;
+    const normalizedPhone = normalizePhone(phone);
+    if (!isValidPakistaniPhone(normalizedPhone)) {
+      setPhoneError('Enter a valid Pakistani mobile number (03XXXXXXXXX)');
+      showToast('Phone number required');
+      return;
+    }
     setPlacing(true);
     try {
       const res = await fetch('/api/orders', {
@@ -94,6 +149,7 @@ export function POSTerminal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_name: customer || (orderType === 'dine-in' ? `Table ${table || '?'}` : 'Counter'),
+          customer_phone: normalizedPhone,
           table_number: orderType === 'dine-in' ? (table || null) : null,
           special_notes: notes || null,
           payment_method: payment,
@@ -107,7 +163,10 @@ export function POSTerminal({
           })),
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? 'Order failed');
+      }
       const order = await res.json();
       setLastOrder({ id: order.id, total: order.total });
       clearCart();
@@ -220,11 +279,38 @@ export function POSTerminal({
               </button>
             ))}
           </div>
+
+          {/* Phone number — required, triggers customer lookup */}
+          <div className="mt-2">
+            <div className="relative">
+              <input
+                value={phone}
+                onChange={e => handlePhoneChange(e.target.value)}
+                placeholder="03XX-XXXXXXX (required)"
+                maxLength={12}
+                className={`w-full bg-[#1a1a1a] border px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none rounded-sm font-body pr-16 ${
+                  phoneError ? 'border-[#E4002B]/60' : 'border-white/10 focus:border-[#E4002B]/40'
+                }`}
+              />
+              {lookingUp && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-heading text-[9px] tracking-widest text-white/20 animate-pulse">
+                  LOOKING…
+                </span>
+              )}
+              {!lookingUp && isValidPakistaniPhone(normalizePhone(phone)) && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400 text-xs">✓</span>
+              )}
+            </div>
+            {phoneError && (
+              <p className="font-heading text-[9px] tracking-wider text-[#E4002B] mt-1">{phoneError}</p>
+            )}
+          </div>
+
           <div className="flex gap-2 mt-2">
             <input
               value={customer}
               onChange={e => setCustomer(e.target.value)}
-              placeholder="Customer name (opt)"
+              placeholder="Customer name (auto-fills on lookup)"
               className="flex-1 bg-[#1a1a1a] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#E4002B]/40 rounded-sm font-body"
             />
             {orderType === 'dine-in' && (
@@ -236,6 +322,32 @@ export function POSTerminal({
               />
             )}
           </div>
+
+          {/* Past orders panel — shows after valid phone lookup */}
+          {pastOrders.length > 0 && (
+            <div className="mt-2 border border-white/5 rounded-sm bg-[#0d0d0d]">
+              <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between">
+                <span className="font-heading text-[9px] tracking-widest text-white/30">
+                  RETURNING CUSTOMER · {pastOrders.length} PREV ORDER{pastOrders.length !== 1 ? 'S' : ''}
+                </span>
+              </div>
+              <div className="max-h-36 overflow-y-auto divide-y divide-white/5">
+                {pastOrders.map(o => (
+                  <div key={o.id} className="px-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-heading text-[10px] text-white/50">
+                        #{o.id.slice(-6).toUpperCase()} · {new Date(o.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <span className="font-heading text-[10px] text-white/50">{formatPKR(o.total)}</span>
+                    </div>
+                    <p className="font-body text-[10px] text-white/25 leading-tight truncate">
+                      {o.order_items.map(i => `${i.quantity}× ${i.item_name}`).join(', ')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Cart items */}

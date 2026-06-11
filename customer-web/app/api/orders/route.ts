@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { isValidPakistaniPhone, normalizePhone } from '@/lib/format';
 
 const VALID_STATUSES = new Set(['pending', 'preparing', 'ready', 'completed']);
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { customer_name, table_number, special_notes, payment_method, items, user_id, staff_id } = body;
+  const { customer_name, customer_phone, table_number, special_notes, payment_method, items, user_id, staff_id } = body;
 
   if (!customer_name || !items?.length) {
     return NextResponse.json({ detail: 'customer_name and items are required' }, { status: 400 });
+  }
+
+  // Phone validation — required, must be valid Pakistani mobile
+  if (!customer_phone) {
+    return NextResponse.json({ detail: 'customer_phone is required' }, { status: 400 });
+  }
+  const phone = normalizePhone(customer_phone);
+  if (!isValidPakistaniPhone(phone)) {
+    return NextResponse.json({ detail: 'Phone must be a valid Pakistani mobile number starting with 03 (e.g. 03001234567)' }, { status: 400 });
   }
 
   const db = createServiceClient();
@@ -18,6 +28,7 @@ export async function POST(req: NextRequest) {
     .from('orders')
     .insert({
       customer_name,
+      customer_phone: phone,
       table_number: table_number || null,
       special_notes: special_notes || null,
       payment_method,
