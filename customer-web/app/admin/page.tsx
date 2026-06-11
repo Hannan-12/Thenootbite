@@ -46,18 +46,6 @@ export default async function AdminDashboard() {
           </p>
         </div>
 
-        {/* POS quick launch */}
-        <Link
-          href="/pos"
-          className="flex items-center justify-between mb-6 border border-[#E4002B]/40 bg-[#E4002B]/5 hover:bg-[#E4002B]/10 rounded-sm px-6 py-4 transition-colors group"
-        >
-          <div>
-            <p className="font-heading text-xs tracking-widest text-[#E4002B] mb-0.5">COUNTER STAFF</p>
-            <p className="font-heading text-lg text-white">Open POS Terminal</p>
-          </div>
-          <span className="font-heading text-2xl text-[#E4002B] group-hover:translate-x-1 transition-transform">⊕ →</span>
-        </Link>
-
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {(Object.entries(counts) as [string, number][]).map(([status, count]) => (
