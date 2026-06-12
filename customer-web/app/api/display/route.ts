@@ -11,5 +11,7 @@ export async function GET() {
     .order('created_at', { ascending: true });
 
   if (error) return NextResponse.json({ detail: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  return NextResponse.json(data ?? [], {
+    headers: { 'Cache-Control': 'no-store' },
+  });
 }
