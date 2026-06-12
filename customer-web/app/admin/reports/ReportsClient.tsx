@@ -184,6 +184,34 @@ export function ReportsClient() {
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
+    } else if (reportType === 'orders_list' && ordersList.length > 0) {
+      const rows = ordersList.map(order => {
+        const date = new Date(order.created_at).toLocaleString('en-PK', {
+          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        });
+        const itemsSummary = order.order_items.map(i => `${i.quantity}× ${i.item_name}`).join(', ');
+        return `<tr>
+          <td style="color:#6b7280;font-size:11px;">${date}</td>
+          <td style="font-weight:600;">#${order.id.slice(-6).toUpperCase()}</td>
+          <td>${order.customer_name}${order.table_number ? ` · T${order.table_number}` : ''}</td>
+          <td style="color:#6b7280;font-size:11px;">${itemsSummary}</td>
+          <td style="text-align:right;color:#6b7280;font-size:11px;">${order.payment_method.toUpperCase()}</td>
+          <td style="text-align:right;font-weight:600;">Rs.${order.total.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+      detailSection = `
+        <h3 style="font-size:11px;letter-spacing:0.15em;color:#6b7280;margin:24px 0 10px;">ALL ORDERS (${ordersList.length})</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="border-bottom:2px solid #e5e7eb;">
+            <th style="text-align:left;padding:6px 0;">DATE & TIME</th>
+            <th style="text-align:left;padding:6px 0;">ORDER #</th>
+            <th style="text-align:left;padding:6px 0;">CUSTOMER</th>
+            <th style="text-align:left;padding:6px 0;">ITEMS</th>
+            <th style="text-align:right;padding:6px 0;">PAYMENT</th>
+            <th style="text-align:right;padding:6px 0;">TOTAL</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
     }
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
