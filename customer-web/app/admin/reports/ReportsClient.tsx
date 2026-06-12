@@ -7,13 +7,22 @@ import { formatPKR } from '@/lib/format';
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type Preset = 'today' | '7d' | '30d' | 'custom';
-type ReportType = 'daily' | 'top_items' | 'top_categories';
+type ReportType = 'daily' | 'top_items' | 'top_categories' | 'orders_list';
 type SortBy = 'revenue' | 'qty';
 
 interface Summary { total_revenue: number; total_orders: number; total_items_sold: number; avg_order_value: number; }
 interface DayRow   { label: string; revenue: number; orders: number; }
 interface TopItem  { item_name: string; revenue: number; qty: number; orders: number; }
 interface TopCat   { category: string; revenue: number; qty: number; orders: number; }
+interface OrderRow {
+  id: string;
+  customer_name: string;
+  table_number: string | null;
+  total: number;
+  payment_method: string;
+  created_at: string;
+  order_items: { item_name: string; quantity: number; item_price: number }[];
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -60,12 +69,14 @@ export function ReportsClient() {
   const [sortBy, setSortBy]         = useState<SortBy>('revenue');
   const [metric, setMetric]         = useState<'revenue' | 'orders'>('revenue');
 
-  const [summary, setSummary]       = useState<Summary | null>(null);
-  const [dailyRows, setDailyRows]   = useState<DayRow[]>([]);
-  const [topItems, setTopItems]     = useState<TopItem[]>([]);
-  const [topCats, setTopCats]       = useState<TopCat[]>([]);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+  const [summary, setSummary]         = useState<Summary | null>(null);
+  const [dailyRows, setDailyRows]     = useState<DayRow[]>([]);
+  const [topItems, setTopItems]       = useState<TopItem[]>([]);
+  const [topCats, setTopCats]         = useState<TopCat[]>([]);
+  const [ordersList, setOrdersList]   = useState<OrderRow[]>([]);
+  const [expandedId, setExpandedId]   = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
 
   const dates = preset === 'custom'
     ? { from: customFrom, to: customTo }
@@ -79,20 +90,22 @@ export function ReportsClient() {
     const q = `from_date=${dates.from}&to_date=${dates.to}`;
 
     try {
-      const [sumRes, dailyRes, itemsRes, catsRes] = await Promise.all([
+      const [sumRes, dailyRes, itemsRes, catsRes, ordersRes] = await Promise.all([
         fetch(`${base}/summary?${q}`),
         fetch(`${base}/sales-over-time?${q}&group_by=day`),
         fetch(`${base}/top-items?${q}&sort_by=${sortBy}&limit=10`),
         fetch(`${base}/top-categories?${q}&sort_by=${sortBy}`),
+        fetch(`${base}/orders-list?${q}`),
       ]);
 
-      if (!sumRes.ok || !dailyRes.ok || !itemsRes.ok || !catsRes.ok) {
+      if (!sumRes.ok || !dailyRes.ok || !itemsRes.ok || !catsRes.ok || !ordersRes.ok) {
         setError('Failed to load report data. Try refreshing.');
       } else {
         setSummary(await sumRes.json());
         setDailyRows(await dailyRes.json());
         setTopItems(await itemsRes.json());
         setTopCats(await catsRes.json());
+        setOrdersList(await ordersRes.json());
       }
     } catch {
       setError('Network error — check your connection and try again.');
@@ -311,6 +324,7 @@ export function ReportsClient() {
             { key: 'daily',          label: 'DAILY SALES' },
             { key: 'top_items',      label: 'TOP ITEMS' },
             { key: 'top_categories', label: 'BY CATEGORY' },
+            { key: 'orders_list',    label: 'ALL ORDERS' },
           ] as { key: ReportType; label: string }[]).map(t => (
             <button
               key={t.key}
@@ -324,7 +338,7 @@ export function ReportsClient() {
           ))}
         </div>
 
-        {reportType !== 'daily' && (
+        {reportType !== 'daily' && reportType !== 'orders_list' && (
           <div className="flex gap-1.5">
             {(['revenue', 'qty'] as SortBy[]).map(s => (
               <button
@@ -517,6 +531,86 @@ export function ReportsClient() {
                 </table>
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ── ALL ORDERS ── */}
+      {reportType === 'orders_list' && (
+        <div className="bg-[#111] border border-white/5 rounded-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+            <p className="font-heading text-xs tracking-widest text-white/40">
+              ALL COMPLETED ORDERS · {dates.from} → {dates.to}
+            </p>
+            <span className="font-heading text-xs text-white/20">{ordersList.length} orders</span>
+          </div>
+
+          {ordersList.length === 0 ? (
+            <div className="px-5 py-12 text-center text-white/20 font-heading text-xs tracking-widest">
+              {loading ? 'LOADING…' : 'NO COMPLETED ORDERS IN THIS PERIOD'}
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {ordersList.map(order => {
+                const isExpanded = expandedId === order.id;
+                const date = new Date(order.created_at).toLocaleString('en-PK', {
+                  day: 'numeric', month: 'short', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                });
+                return (
+                  <div key={order.id} className="hover:bg-white/[0.02] transition-colors">
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                      className="w-full px-5 py-3 flex items-center gap-4 text-left"
+                    >
+                      <span className="font-heading text-[10px] text-white/20 w-4 flex-shrink-0">
+                        {isExpanded ? '▲' : '▼'}
+                      </span>
+                      <span className="font-heading text-sm text-white/60 w-[5.5rem] flex-shrink-0 tracking-wider">
+                        #{order.id.slice(-6).toUpperCase()}
+                      </span>
+                      <span className="font-heading text-xs text-white/30 flex-1 min-w-0 truncate">
+                        {order.customer_name}
+                        {order.table_number ? ` · T${order.table_number}` : ''}
+                      </span>
+                      <span className="font-heading text-[10px] text-white/20 hidden sm:block flex-shrink-0 tracking-wider">
+                        {order.payment_method.toUpperCase()}
+                      </span>
+                      <span className="font-heading text-xs text-white/40 flex-shrink-0 hidden md:block">
+                        {date}
+                      </span>
+                      <span className="font-heading text-sm text-white flex-shrink-0 ml-auto">
+                        {formatPKR(order.total)}
+                      </span>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-5 pb-4 pt-1 bg-white/[0.015]">
+                        <p className="font-heading text-[10px] tracking-widest text-white/20 mb-2">ITEMS</p>
+                        <div className="space-y-1">
+                          {order.order_items.map((item, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <span className="text-white/50">
+                                <span className="text-white/70">{item.quantity}×</span> {item.item_name}
+                              </span>
+                              <span className="text-white/30 font-heading">
+                                {formatPKR(item.item_price * item.quantity)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-white/5 flex justify-between text-xs font-heading">
+                          <span className="text-white/30 tracking-widest">
+                            {date} · {order.payment_method.toUpperCase()}
+                          </span>
+                          <span className="text-white">{formatPKR(order.total)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
