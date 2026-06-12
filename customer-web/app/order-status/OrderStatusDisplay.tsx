@@ -33,6 +33,9 @@ function useOrders() {
   useEffect(() => {
     fetch_();
 
+    // Poll every 5s as fallback in case Realtime misses an event
+    const poll = setInterval(fetch_, 5000);
+
     const channel = supabaseRef.current
       .channel('order-status-display')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
@@ -63,7 +66,10 @@ function useOrders() {
         isFirst.current = false;
       });
 
-    return () => { supabaseRef.current.removeChannel(channel); };
+    return () => {
+      clearInterval(poll);
+      supabaseRef.current.removeChannel(channel);
+    };
   }, [fetch_]);
 
   return { preparing, ready, reconnect };
