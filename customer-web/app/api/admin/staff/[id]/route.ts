@@ -17,6 +17,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .single();
 
   if (error) return NextResponse.json({ detail: error.message }, { status: 500 });
+
+  // If deactivating, kill their auth session immediately
+  if (body.is_active === false) {
+    await db.auth.admin.signOut(params.id, 'others');
+  }
+
   return NextResponse.json(data);
 }
 
@@ -33,5 +39,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     .eq('id', params.id);
 
   if (error) return NextResponse.json({ detail: error.message }, { status: 500 });
+
+  // Kill their auth session immediately
+  await db.auth.admin.signOut(params.id, 'others');
+
   return NextResponse.json({ ok: true });
 }
