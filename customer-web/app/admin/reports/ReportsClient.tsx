@@ -189,7 +189,9 @@ export function ReportsClient() {
         const date = new Date(order.created_at).toLocaleString('en-PK', {
           day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
         });
-        const itemsSummary = order.order_items.map(i => `${i.quantity}× ${i.item_name}`).join(', ');
+        const itemsSummary = order.order_items.length > 0
+          ? order.order_items.map(i => `${i.quantity}× ${i.item_name}`).join(', ')
+          : '—';
         return `<tr>
           <td style="color:#6b7280;font-size:11px;">${date}</td>
           <td style="font-weight:600;">#${order.id.slice(-6).toUpperCase()}</td>
@@ -616,7 +618,9 @@ export function ReportsClient() {
                       <div className="px-5 pb-4 pt-1 bg-white/[0.015]">
                         <p className="font-heading text-[10px] tracking-widest text-white/20 mb-2">ITEMS</p>
                         <div className="space-y-1">
-                          {order.order_items.map((item, i) => (
+                          {order.order_items.length === 0 ? (
+                            <p className="text-white/20 text-xs font-heading tracking-wider">NO ITEM DATA</p>
+                          ) : order.order_items.map((item, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                               <span className="text-white/50">
                                 <span className="text-white/70">{item.quantity}×</span> {item.item_name}
