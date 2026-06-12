@@ -4,9 +4,6 @@ import { requireAdminApi } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
-export const EXPENSE_CATEGORIES = [
-  'Rent', 'Utilities', 'Salaries', 'Marketing', 'Maintenance', 'Supplies', 'Other',
-];
 
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminApi();
