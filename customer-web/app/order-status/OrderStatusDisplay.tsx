@@ -15,11 +15,11 @@ function useOrders() {
   const [preparing, setPreparing] = useState<Order[]>([]);
   const [ready, setReady]         = useState<Order[]>([]);
   const [reconnect, setReconnect] = useState(false);
-  const supabase = createClient();
-  const isFirst  = useRef(true);
+  const supabaseRef = useRef(createClient());
+  const isFirst     = useRef(true);
 
   const fetch_ = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await supabaseRef.current
       .from('orders')
       .select('id, customer_name, table_number, status, created_at')
       .in('status', ['preparing', 'ready'])
@@ -28,12 +28,12 @@ function useOrders() {
     const rows = (data ?? []) as Order[];
     setPreparing(rows.filter(o => o.status === 'preparing'));
     setReady(rows.filter(o => o.status === 'ready'));
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetch_();
 
-    const channel = supabase
+    const channel = supabaseRef.current
       .channel('order-status-display')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         const row = payload.new as Order;
@@ -63,8 +63,8 @@ function useOrders() {
         isFirst.current = false;
       });
 
-    return () => { supabase.removeChannel(channel); };
-  }, [fetch_, supabase]);
+    return () => { supabaseRef.current.removeChannel(channel); };
+  }, [fetch_]);
 
   return { preparing, ready, reconnect };
 }

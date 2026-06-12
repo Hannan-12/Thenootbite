@@ -46,15 +46,15 @@ export default function KitchenDisplay() {
   const [error, setError] = useState<string | null>(null);
   const [reconnectBanner, setReconnectBanner] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
-  const supabase = createClient();
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const supabaseRef = useRef(createClient());
+  const channelRef  = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null);
   const isFirstConnect = useRef(true);
 
   useElapsedTick();
 
   const fetchOrders = useCallback(async () => {
     try {
-      const { data, error: err } = await supabase
+      const { data, error: err } = await supabaseRef.current
         .from('orders')
         .select('*, order_items(*)')
         .in('status', ['pending', 'preparing'])
@@ -67,12 +67,12 @@ export default function KitchenDisplay() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   const advanceStatus = useCallback(async (id: string, next: OrderStatus) => {
     setUpdatingIds(prev => new Set(prev).add(id));
     try {
-      const { error: err } = await supabase
+      const { error: err } = await supabaseRef.current
         .from('orders')
         .update({ status: next, updated_at: new Date().toISOString() })
         .eq('id', id);
@@ -87,18 +87,18 @@ export default function KitchenDisplay() {
     } finally {
       setUpdatingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchOrders();
 
-    const channel = supabase
+    const channel = supabaseRef.current
       .channel('kitchen-orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
         if (payload.eventType === 'INSERT') {
           const row = payload.new as Order;
           if (['pending', 'preparing'].includes(row.status)) {
-            const { data } = await supabase
+            const { data } = await supabaseRef.current
               .from('orders')
               .select('*, order_items(*)')
               .eq('id', row.id)
@@ -137,8 +137,8 @@ export default function KitchenDisplay() {
       });
 
     channelRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchOrders, supabase]);
+    return () => { supabaseRef.current.removeChannel(channel); };
+  }, [fetchOrders]);
 
   if (loading) {
     return (
