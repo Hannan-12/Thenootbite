@@ -19,13 +19,10 @@ function useOrders() {
   const isFirst     = useRef(true);
 
   const fetch_ = useCallback(async () => {
-    const { data } = await supabaseRef.current
-      .from('orders')
-      .select('id, customer_name, table_number, status, created_at')
-      .in('status', ['preparing', 'ready'])
-      .order('created_at', { ascending: true });
-
-    const rows = (data ?? []) as Order[];
+    // Use server API route (service key, bypasses RLS)
+    const res = await fetch('/api/display');
+    if (!res.ok) return;
+    const rows: Order[] = await res.json();
     setPreparing(rows.filter(o => o.status === 'preparing'));
     setReady(rows.filter(o => o.status === 'ready'));
   }, []);
@@ -38,25 +35,8 @@ function useOrders() {
 
     const channel = supabaseRef.current
       .channel('order-status-display')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        const row = payload.new as Order;
-
-        if (payload.eventType === 'DELETE' || row.status === 'pending' || row.status === 'completed') {
-          const id = (payload.old as Order)?.id ?? row.id;
-          setPreparing(p => p.filter(o => o.id !== id));
-          setReady(r => r.filter(o => o.id !== id));
-          return;
-        }
-
-        if (row.status === 'preparing') {
-          setPreparing(p => [...p.filter(o => o.id !== row.id), row].sort((a, b) => a.created_at.localeCompare(b.created_at)));
-          setReady(r => r.filter(o => o.id !== row.id));
-        }
-
-        if (row.status === 'ready') {
-          setReady(r => [...r.filter(o => o.id !== row.id), row].sort((a, b) => a.created_at.localeCompare(b.created_at)));
-          setPreparing(p => p.filter(o => o.id !== row.id));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetch_();
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED' && !isFirst.current) {
