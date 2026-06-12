@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 
-const FULLSCREEN_ROUTES = ['/kitchen', '/pos'];
+const FULLSCREEN_ROUTES = ['/kitchen', '/pos', '/order-status'];
 
 export function ShellWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
