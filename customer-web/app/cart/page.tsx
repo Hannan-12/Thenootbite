@@ -9,7 +9,19 @@ export default function CartPage() {
   const { lines, setQuantity, removeLine, totalPrice } = useCart();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  if (!mounted) return (
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
+      <div className="h-10 w-48 bg-white/5 rounded-sm animate-pulse mb-8" />
+      <div className="bg-card border border-theme rounded-sm overflow-hidden divide-y divide-theme">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="px-6 py-5 flex items-center gap-4">
+            <div className="flex-1 h-4 bg-white/5 rounded-sm animate-pulse" />
+            <div className="w-20 h-4 bg-white/5 rounded-sm animate-pulse" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (lines.length === 0) {
     return (

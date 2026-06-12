@@ -15,7 +15,6 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { lines, totalPrice, clear } = useCart();
   const [mounted, setMounted]       = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const [userId, setUserId]         = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
@@ -33,30 +32,23 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setMounted(true);
+    // Pre-fill from profile if logged in — guests proceed without login
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data }) => {
       const uid = data.user?.id ?? null;
-      if (!uid) {
-        router.replace('/login?next=/checkout');
-        return;
-      }
-      // Check profile exists
+      if (!uid) return; // guest — no pre-fill, form stays empty
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, full_name, phone')
+        .select('full_name, phone')
         .eq('id', uid)
         .single();
-      if (!profile?.full_name) {
-        // Profile incomplete — send to profile page to fill in
-        router.replace('/profile?next=/checkout');
-        return;
-      }
       setUserId(uid);
-      setAuthChecked(true);
+      if (profile?.full_name) setName(profile.full_name);
+      if (profile?.phone) setPhone(profile.phone);
     });
-  }, [router]);
+  }, []);
 
-  if (!mounted || !authChecked) return (
+  if (!mounted) return (
     <div className="min-h-screen flex items-center justify-center bg-surface">
       <p className="font-heading text-sm tracking-widest text-muted animate-pulse">LOADING…</p>
     </div>
@@ -122,7 +114,20 @@ export default function CheckoutPage() {
   return (
     <div className="bg-surface min-h-screen">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10 sm:py-16">
-        <h1 className="font-heading text-3xl sm:text-5xl text-primary mb-8 sm:mb-12">CHECKOUT</h1>
+        <h1 className="font-heading text-3xl sm:text-5xl text-primary mb-6 sm:mb-10">CHECKOUT</h1>
+
+        {/* Guest nudge — only shown when not logged in */}
+        {!userId && (
+          <div className="mb-6 border border-theme rounded-sm px-4 py-3 flex items-center justify-between gap-4 bg-card">
+            <p className="text-sm text-muted">
+              <Link href="/login?next=/checkout" className="text-primary font-heading tracking-wider hover:text-brand-red transition-colors">
+                SIGN IN
+              </Link>
+              {' '}to pre-fill your details and track this order.
+            </p>
+            <span className="text-xs text-muted/50 font-heading tracking-wider flex-shrink-0">OR CONTINUE AS GUEST</span>
+          </div>
+        )}
 
         <div className="grid gap-8 md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_340px]">
           {/* Form */}
