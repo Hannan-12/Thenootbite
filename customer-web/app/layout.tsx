@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
                   {/* Links */}
                   <div className="flex flex-wrap gap-6">
-                    {['Menu', 'Cart', 'Checkout'].map((link) => (
+                    {['Menu', 'Cart', 'Checkout', 'Careers'].map((link) => (
                       <a
                         key={link}
                         href={`/${link.toLowerCase()}`}
