@@ -6,17 +6,18 @@ interface AttendanceRecord {
   id: string | null;
   staff_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'no_records';
   check_in: string | null;
   check_out: string | null;
   note: string | null;
   staff: { full_name: string; role: string; staff_type: string };
 }
 
-const STATUS_STYLES = {
-  present: 'border-green-500/30 bg-green-500/5 text-green-400',
-  late:    'border-yellow-500/30 bg-yellow-500/5 text-yellow-400',
-  absent:  'border-white/10 bg-white/3 text-white/30',
+const STATUS_STYLES: Record<string, string> = {
+  present:    'border-green-500/30 bg-green-500/5 text-green-400',
+  late:       'border-yellow-500/30 bg-yellow-500/5 text-yellow-400',
+  absent:     'border-white/10 bg-white/5 text-white/30',
+  no_records: 'border-white/5 bg-white/3 text-white/20',
 };
 
 function fmt(iso: string | null) {
@@ -76,11 +77,11 @@ export function AttendanceClient() {
     load();
   }
 
-  // Monthly summary
+  // Monthly summary — skip no_records placeholders in counts
   const staffSummary = records.reduce<Record<string, { name: string; role: string; present: number; late: number; absent: number }>>((acc, r) => {
     const id = r.staff_id;
     if (!acc[id]) acc[id] = { name: r.staff?.full_name, role: r.staff?.role, present: 0, late: 0, absent: 0 };
-    acc[id][r.status]++;
+    if (r.status !== 'no_records') acc[id][r.status]++;
     return acc;
   }, {});
 

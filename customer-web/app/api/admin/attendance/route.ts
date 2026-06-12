@@ -12,13 +12,31 @@ export async function GET(req: NextRequest) {
   const db = createServiceClient();
 
   if (month) {
-    const { data } = await db
-      .from('attendance')
-      .select('*, staff(full_name, role, staff_type)')
-      .gte('date', `${month}-01`)
-      .lte('date', `${month}-31`)
-      .order('date', { ascending: false });
-    return NextResponse.json(data ?? []);
+    const [{ data: records }, { data: allStaff }] = await Promise.all([
+      db.from('attendance')
+        .select('*, staff(full_name, role, staff_type)')
+        .gte('date', `${month}-01`)
+        .lte('date', `${month}-31`)
+        .order('date', { ascending: false }),
+      db.from('staff').select('id, full_name, role, staff_type').eq('is_active', true),
+    ]);
+
+    // Ensure every active staff member appears even if no records this month
+    const staffWithRecords = new Set((records ?? []).map((r: { staff_id: string }) => r.staff_id));
+    const staffPlaceholders = (allStaff ?? [])
+      .filter(s => !staffWithRecords.has(s.id))
+      .map(s => ({
+        id: null,
+        staff_id: s.id,
+        date: `${month}-01`,
+        status: 'no_records',
+        check_in: null,
+        check_out: null,
+        note: null,
+        staff: { full_name: s.full_name, role: s.role, staff_type: s.staff_type },
+      }));
+
+    return NextResponse.json([...(records ?? []), ...staffPlaceholders]);
   }
 
   // Daily view — also include staff with no record today (absent)
