@@ -58,7 +58,18 @@ export function POSTerminal({
   const [notes, setNotes]           = useState('');
   const [payment, setPayment]       = useState<PaymentMethod>('cash');
   const [placing, setPlacing]       = useState(false);
-  const [lastOrder, setLastOrder]   = useState<{ id: string; total: number } | null>(null);
+  const [lastOrder, setLastOrder]   = useState<{
+    id: string;
+    total: number;
+    customerName: string;
+    phone: string;
+    table: string;
+    orderType: OrderType;
+    payment: PaymentMethod;
+    items: CartLine[];
+    notes: string;
+    placedAt: Date;
+  } | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
   const searchRef                   = useRef<HTMLInputElement>(null);
   const lookupTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,7 +179,18 @@ export function POSTerminal({
         throw new Error(err.detail ?? 'Order failed');
       }
       const order = await res.json();
-      setLastOrder({ id: order.id, total: order.total });
+      setLastOrder({
+        id: order.id,
+        total: order.total,
+        customerName: customer || (orderType === 'dine-in' ? `Table ${table || '?'}` : 'Counter'),
+        phone: normalizedPhone,
+        table,
+        orderType,
+        payment,
+        items: [...cart],
+        notes,
+        placedAt: new Date(),
+      });
       clearCart();
       showToast('Order placed!');
     } catch (e) {
@@ -181,6 +203,82 @@ export function POSTerminal({
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2000);
+  }
+
+  function printReceipt() {
+    if (!lastOrder) return;
+    const { id, total, customerName, phone, table, orderType, payment, items, notes, placedAt } = lastOrder;
+    const dateStr = placedAt.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = placedAt.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+
+    const rows = items.map(l =>
+      `<tr>
+        <td style="padding:3px 0;font-size:12px;">${l.name}</td>
+        <td style="padding:3px 0;font-size:12px;text-align:center;">${l.quantity}</td>
+        <td style="padding:3px 0;font-size:12px;text-align:right;">Rs.${(l.price * l.quantity).toLocaleString()}</td>
+      </tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Receipt #${id.slice(-6).toUpperCase()}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; width: 72mm; margin: 0 auto; padding: 8px; font-size: 12px; color: #000; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .divider { border-top: 1px dashed #000; margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  .total-row td { font-weight: bold; font-size: 14px; padding-top: 4px; }
+  @media print { @page { margin: 0; size: 72mm auto; } }
+</style>
+</head>
+<body>
+  <div class="center bold" style="font-size:18px;letter-spacing:2px;">TNB</div>
+  <div class="center" style="font-size:10px;margin-bottom:2px;">The Nook Bite</div>
+  <div class="center" style="font-size:10px;">Cashier: ${staffName}</div>
+  <div class="divider"></div>
+  <div style="font-size:11px;">Order: <b>#${id.slice(-6).toUpperCase()}</b></div>
+  <div style="font-size:11px;">${dateStr} ${timeStr}</div>
+  <div style="font-size:11px;">${orderType === 'dine-in' ? `Table: ${table || '—'}` : 'Takeaway'}</div>
+  ${customerName ? `<div style="font-size:11px;">Customer: ${customerName}</div>` : ''}
+  ${phone ? `<div style="font-size:11px;">Phone: ${phone}</div>` : ''}
+  <div class="divider"></div>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left;font-size:11px;padding-bottom:2px;">Item</th>
+        <th style="text-align:center;font-size:11px;">Qty</th>
+        <th style="text-align:right;font-size:11px;">Amt</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="divider"></div>
+  <table>
+    <tr class="total-row">
+      <td>TOTAL</td>
+      <td></td>
+      <td style="text-align:right;">Rs.${total.toLocaleString()}</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="font-size:11px;padding-top:2px;">Payment: ${payment.toUpperCase()}</td>
+    </tr>
+  </table>
+  ${notes ? `<div class="divider"></div><div style="font-size:10px;">Note: ${notes}</div>` : ''}
+  <div class="divider"></div>
+  <div class="center" style="font-size:10px;margin-top:4px;">Thank you for visiting TNB!</div>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank', 'width=400,height=600');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 300);
   }
 
   return (
@@ -452,12 +550,20 @@ export function POSTerminal({
           <div className="mx-4 mb-4 border border-green-500/30 bg-green-500/5 rounded-sm px-4 py-3">
             <p className="font-heading text-xs tracking-widest text-green-400 mb-0.5">ORDER PLACED ✓</p>
             <p className="font-heading text-xs text-white/50">#{lastOrder.id.slice(-6).toUpperCase()} — {formatPKR(lastOrder.total)}</p>
-            <a
-              href={`/admin/orders/${lastOrder.id}`}
-              className="font-heading text-[10px] tracking-widest text-green-400/60 hover:text-green-400 transition-colors"
-            >
-              VIEW ORDER →
-            </a>
+            <div className="flex items-center gap-4 mt-2">
+              <a
+                href={`/admin/orders/${lastOrder.id}`}
+                className="font-heading text-[10px] tracking-widest text-green-400/60 hover:text-green-400 transition-colors"
+              >
+                VIEW ORDER →
+              </a>
+              <button
+                onClick={printReceipt}
+                className="font-heading text-[10px] tracking-widest text-white/40 hover:text-white border border-white/10 hover:border-white/30 px-2 py-1 rounded-sm transition-colors"
+              >
+                🖨 PRINT
+              </button>
+            </div>
           </div>
         )}
       </div>
