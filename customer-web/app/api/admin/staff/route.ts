@@ -54,7 +54,6 @@ export async function POST(req: NextRequest) {
   // Send welcome email via Resend
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://thenookbite.com';
     const emailDomain = process.env.EMAIL_DOMAIN ?? 'thenookbite.com';
     const resolvedRole = role ?? 'cashier';
     const resolvedStaffType = staff_type ?? 'pos';
@@ -91,18 +90,6 @@ export async function POST(req: NextRequest) {
               <p style="margin:0 0 4px;font-weight:600;text-transform:uppercase;color:#fff">${resolvedRole}</p>
               <p style="margin:0;font-size:12px;color:#555;text-transform:uppercase">${resolvedStaffType === 'pos' ? 'POS Staff' : 'Non-POS Staff'}</p>
             </div>
-
-            ${isPOS ? `
-            <a href="${siteUrl}/pos/login"
-               style="background:#E4002B;color:#fff;text-decoration:none;padding:14px 28px;font-weight:700;letter-spacing:2px;font-size:13px;border-radius:4px;display:inline-block;margin-bottom:16px">
-              OPEN POS TERMINAL →
-            </a>
-            ` : ''}
-
-            <a href="${siteUrl}/checkin"
-               style="background:#1a1a1a;color:#FFD700;text-decoration:none;padding:14px 28px;font-weight:700;letter-spacing:2px;font-size:13px;border-radius:4px;display:inline-block;border:1px solid #333;margin-bottom:24px${isPOS ? ';margin-left:8px' : ''}">
-              CHECK-IN TABLET →
-            </a>
 
             <p style="color:#444;font-size:12px;border-top:1px solid #1f1f1f;padding-top:16px;margin:0">
               The Nook Bite · Do not share your credentials or PIN with anyone.
